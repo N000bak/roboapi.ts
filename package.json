@@ -1,5 +1,5 @@
 {
-  "name": "robokassa.ts",
+  "name": "roboapi.ts",
   "version": "0.1.0",
   "description": "Robokassa API Library",
   "main": "dist/RobokassaPayAPI.js",
@@ -17,13 +17,14 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://gitlab.com/impulit/robokassa.git"
+    "url": "git+https://github.com/Altairko/roboapi.ts.git"
   },
   "keywords": [
     "robokassa",
-    "impulsit",
-    "impuls",
-    "api"
+    "robokassa api",
+    "typescript",
+    "nodejs",
+    "robokassa ts"
   ],
   "author": {
     "name": "n000bak",
@@ -31,9 +32,9 @@
   },
   "license": "MIT",
   "bugs": {
-    "url": "https://gitlab.com/impulit/robokassa/issues"
+    "url": "https://github.com/Altairko/roboapi.ts/issues"
   },
-  "homepage": "https://gitlab.com/impulit/robokassa#readme",
+  "homepage": "https://github.com/Altairko/roboapi.ts/issues#readme",
   "devDependencies": {
     "@types/lodash": "^4.14.145",
     "@types/node": "^12.12.6",
