@@ -1,6 +1,6 @@
 {
-  "name": "@impulsit/robokassa",
-  "version": "0.0.1",
+  "name": "robokassa.ts",
+  "version": "0.1.0",
   "description": "Robokassa API Library",
   "main": "dist/RobokassaPayAPI.js",
   "types": "dist/RobokassaPayAPI.d.ts",
