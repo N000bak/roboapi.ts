@@ -50,7 +50,7 @@ class RobokassaPayAPI {
     private readonly smsUrl: string;
 
     /**
-     * @var string
+     * @var TCurrency
      */
     private readonly outCurrency: TCurrency;
 
@@ -62,9 +62,9 @@ class RobokassaPayAPI {
     /**
      *
      * @param {string} url
-     * @param {object} params
+     * @param {TSimpleObj} params
      *
-     * @return Promise
+     * @return Promise<any>
      */
     private static async createRequest(url: string, params: TSimpleObj): Promise<any> {
         await axios({
@@ -79,7 +79,7 @@ class RobokassaPayAPI {
      * @param {string} mrhPass1
      * @param {string} mrhPass2
      * @param {string} method
-     * @param {string} outCurrency
+     * @param {TCurrency} outCurrency
      */
     constructor(
         mrhLogin: string,
@@ -98,7 +98,7 @@ class RobokassaPayAPI {
     }
 
     /**
-     * @return object
+     * @return TSimpleObj
      */
     public getResponse(): TSimpleObj {
         return this.response;
@@ -106,9 +106,9 @@ class RobokassaPayAPI {
 
     /**
      * @param {string} apiMethod
-     * @param {array}  params
+     * @param {TSimpleObj}  params
      *
-     * @return object
+     * @return TSimpleObj
      */
     private getData(apiMethod: string, params: TSimpleObj): TSimpleObj {
         return this.parseXmlAndConvertToJson(this.apiUrl, apiMethod, params);
@@ -154,7 +154,7 @@ class RobokassaPayAPI {
      * @param {string} string
      * @param {string} method
      *
-     * @return string
+     * @return string | never
      *
      * @throws \Exception
      */
@@ -173,7 +173,7 @@ class RobokassaPayAPI {
      * @param {string} phone
      * @param {string} message
      *
-     * @return boolean
+     * @return boolean | never
      * @throws \Exception
      */
     public async sendSms(phone: string, message: string): Promise<boolean> | never {
@@ -188,7 +188,7 @@ class RobokassaPayAPI {
             const response = await RobokassaPayAPI.createRequest(this.smsUrl, params);
             this.response = response;
 
-            return response && response['result'] == 1;
+            return response && response['data'] && response['data']['result'] === 1;
         } catch (error) {
             throw new Error(error);
         }
@@ -200,7 +200,7 @@ class RobokassaPayAPI {
      * @param {string} incCurrLabel Кодовое имя метода оплаты
      * @param {int}    sum          Стоимость товара
      *
-     * @return float Комиссия метода в %
+     * @return number Комиссия метода в %
      */
     public getCommission(incCurrLabel: string, sum = 10000): number {
         const parsed = this.getData('CalcOutSumm', {
@@ -218,7 +218,7 @@ class RobokassaPayAPI {
      * @param {string} incCurrLabel Кодовое имя метода оплаты
      * @param {int}    sum          Стоимость товара
      *
-     * @return float Стоимость, которую необходимо передавать в Робокассу.
+     * @return number Стоимость, которую необходимо передавать в Робокассу.
      */
     public getCommissionSum(incCurrLabel: string, sum: number): number {
         const parsed = this.getData('CalcOutSumm', {
@@ -233,7 +233,7 @@ class RobokassaPayAPI {
     /**
      * Запрашивает и парсит в массив все возможные способы оплаты для данного магазина
      *
-     * @return array
+     * @return Array<TPay> | Array<unknown>
      */
     public getCurrLabels(): TPay[] | unknown[] {
         const parsed = this.getData('GetCurrencies', {
@@ -273,9 +273,9 @@ class RobokassaPayAPI {
      *
      * @param {string} apiUrl
      * @param {string} controller
-     * @param {object} params
+     * @param {TSimpleObj} params
      *
-     * @return object
+     * @return TSimpleObj | never
      */
     private parseXmlAndConvertToJson(apiUrl: string, controller: string, params: TSimpleObj): TSimpleObj | never {
         const url = `${apiUrl}/${controller}`;
@@ -303,7 +303,7 @@ class RobokassaPayAPI {
             Signature: this.getSignature(`${this.mrhLogin}:${invId}:${this.mrhPass2}`, 'md5'),
         });
 
-        return result['Result']['Code'] == '0';
+        return result['Result']['Code'] === 0;
     }
 
 }
