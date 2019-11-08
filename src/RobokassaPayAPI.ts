@@ -60,6 +60,11 @@ class RobokassaPayAPI {
     private response: TSimpleObj = {};
 
     /**
+     * @var boolean
+     */
+    private readonly isTest: boolean;
+
+    /**
      *
      * @param {string} url
      * @param {TSimpleObj} params
@@ -80,13 +85,15 @@ class RobokassaPayAPI {
      * @param {string} mrhPass2
      * @param {string} method
      * @param {TCurrency} outCurrency
+     * @param {boolean} isTest
      */
     constructor(
         mrhLogin: string,
         mrhPass1: string,
         mrhPass2: string,
         method: string,
-        outCurrency: TCurrency
+        outCurrency: TCurrency,
+        isTest?: boolean
     ) {
         this.mrhLogin = mrhLogin;
             this.mrhPass1 = mrhPass1;
@@ -95,6 +102,7 @@ class RobokassaPayAPI {
             this.outCurrency = outCurrency;
             this.apiUrl = 'https://auth.robokassa.ru/Merchant/WebService/Service.asmx/';
             this.smsUrl = 'https://services.robokassa.ru/SMS/';
+            this.isTest = isTest || false;
     }
 
     /**
@@ -206,7 +214,8 @@ class RobokassaPayAPI {
         const parsed = this.getData('CalcOutSumm', {
             MerchantLogin: this.mrhLogin,
             IncCurrLabel: incCurrLabel === 'all' ? '' : incCurrLabel,
-            IncSum: sum
+            IncSum: sum,
+            IsTest: Number(this.isTest)
         });
 
         return Math.abs(Math.round((sum - parsed['OutSum']) / parsed['OutSum'] * 100));
@@ -225,6 +234,7 @@ class RobokassaPayAPI {
             MerchantLogin: this.mrhLogin,
             IncCurrLabel: incCurrLabel,
             IncSum: sum,
+            IsTest: Number(this.isTest)
         });
 
         return parsed && parsed.OutSum;
@@ -239,6 +249,7 @@ class RobokassaPayAPI {
         const parsed = this.getData('GetCurrencies', {
             MerchantLogin: this.mrhLogin,
             Language: 'ru',
+            IsTest: Number(this.isTest)
         });
 
         const paymentMethods: TPay[] | unknown[] = [];
@@ -301,6 +312,7 @@ class RobokassaPayAPI {
             MerchantLogin: this.mrhLogin,
             InvoiceID: invId,
             Signature: this.getSignature(`${this.mrhLogin}:${invId}:${this.mrhPass2}`, 'md5'),
+            IsTest: Number(this.isTest)
         });
 
         return result['Result']['Code'] === 0;
