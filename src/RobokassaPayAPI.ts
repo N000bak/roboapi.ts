@@ -1,5 +1,5 @@
-import { join, difference, includes, toUpper, forEach } from 'lodash';
-import {createHash} from "crypto";
+import {join, difference, includes, toUpper, forEach} from 'lodash';
+import {createHash} from 'crypto';
 import axios from 'axios';
 import {validate, parse} from 'fast-xml-parser';
 
@@ -96,13 +96,13 @@ class RobokassaPayAPI {
         isTest?: boolean
     ) {
         this.mrhLogin = mrhLogin;
-            this.mrhPass1 = mrhPass1;
-            this.mrhPass2 = mrhPass2;
-            this.method = method;
-            this.outCurrency = outCurrency;
-            this.apiUrl = 'https://auth.robokassa.ru/Merchant/WebService/Service.asmx/';
-            this.smsUrl = 'https://services.robokassa.ru/SMS/';
-            this.isTest = isTest || false;
+        this.mrhPass1 = mrhPass1;
+        this.mrhPass2 = mrhPass2;
+        this.method = method;
+        this.outCurrency = outCurrency;
+        this.apiUrl = 'https://auth.robokassa.ru/Merchant/WebService/Service.asmx/';
+        this.smsUrl = 'https://services.robokassa.ru/SMS/';
+        this.isTest = isTest || false;
     }
 
     /**
@@ -123,7 +123,7 @@ class RobokassaPayAPI {
     }
 
     /**
-     * Если receiptJson пустой (то есть имеет значение "[]") - то в формировании сигнатуры
+     * Если receiptJson пустой - то в формировании сигнатуры
      * он не будет использоваться, а если не пустой - используем его json-представление
      *
      * @param {string} sum
@@ -132,32 +132,31 @@ class RobokassaPayAPI {
      *
      * @return string
      */
-    private getSignatureString(sum: string, invId: string, receiptJson: string): string
-    {
+    private getSignatureString(sum: string, invId: string, receiptJson: string): string {
 
-        /** @var null|string $outCurrency */
+        /** @var null|string outCurrency */
         const outCurrency = this.outCurrency || null;
 
         return join(
             difference(
-        [
-                this.mrhLogin,
-                sum,
-                invId,
-                outCurrency,
-                receiptJson,
-                this.mrhPass1,
-            ],
-            [
-                false,
-                '',
-                null
-            ]
-        ),':');
+                [
+                    this.mrhLogin,
+                    sum,
+                    invId,
+                    outCurrency,
+                    receiptJson,
+                    this.mrhPass1,
+                ],
+                [
+                    false,
+                    '',
+                    null
+                ]
+            ), ':');
     }
 
     /**
-     * Генерирует хеш для строки $string с помощью метода $method
+     * Генерирует хеш для строки string с помощью метода method
      *
      * @param {string} string
      * @param {string} method
@@ -253,8 +252,7 @@ class RobokassaPayAPI {
         });
 
         const paymentMethods: TPay[] | unknown[] = [];
-        if(parsed && parsed['Groups'])
-        {
+        if (parsed && parsed['Groups']) {
             forEach(parsed['Groups'] && parsed['Groups']['Group'], group => {
                 if (group) {
                     forEach(group && group['Items'] && group['Items']['Currency'], currency => {
@@ -295,9 +293,9 @@ class RobokassaPayAPI {
                 return parse(response.data)
             }
         })
-        .catch(function (error) {
-            throw new Error(error)
-        });
+            .catch(function (error) {
+                throw new Error(error)
+            });
     }
 
     /**
