@@ -11,11 +11,16 @@ export type TPay = {
     Name: string;
     Label: string;
     Alias: string;
-    Commission: number;
     MinValue: number;
     MaxValue: number;
 }
 export type THash = 'md5' | 'ripemd160' | 'sha1' | 'sha256' | 'sha384' | 'sha512' | 'md5';
+export type TReCheck = {
+    code: number;
+    message: string;
+    success: boolean;
+}
+
 
 class RobokassaPayAPI {
 
@@ -240,7 +245,7 @@ class RobokassaPayAPI {
     }
 
     /**
-     * Запрашивает и парсит в массив все возможные способы оплаты для данного магазина
+     * Получение списка валют, доступных магазину
      *
      * @return Array<TPay> | Array<unknown>
      */
@@ -254,21 +259,15 @@ class RobokassaPayAPI {
         const paymentMethods: TPay[] | unknown[] = [];
         if (parsed && parsed['Groups']) {
             forEach(parsed['Groups'] && parsed['Groups']['Group'], group => {
-                if (group) {
-                    forEach(group && group['Items'] && group['Items']['Currency'], currency => {
-                        if (currency['@attributes']) {
-                            const attributes = currency['@attributes'];
-                            if (attributes['Name']) {
-                                paymentMethods.push({
-                                    Name: attributes['Name'],
-                                    Label: attributes['Label'],
-                                    Alias: attributes['Alias'],
-                                    Commission: this.getCommission(attributes['Label']),
-                                    MinValue: attributes['MinValue'] ? attributes['MinValue'] : 0,
-                                    MaxValue: attributes['MaxValue'] ? attributes['MaxValue'] : 9999999,
-                                } as TPay);
-                            }
-                        }
+                if (group && group['Items'] && group['Items']['Currency']) {
+                    forEach(group['Items']['Currency'], currency => {
+                        paymentMethods.push({
+                            Name: currency['@_Name'],
+                            Label: currency['@_Label'],
+                            Alias: currency['@_Alias'],
+                            MinValue: currency['@_MinValue'] ? currency['@_MinValue'] : 0,
+                            MaxValue: currency['@_MaxValue'] ? currency['@_MaxValue'] : 9999999,
+                        } as TPay);
                     });
                 }
             })
@@ -292,10 +291,9 @@ class RobokassaPayAPI {
             if (response && response.data && validate(response.data)) {
                 return parse(response.data)
             }
-        })
-            .catch(function (error) {
-                throw new Error(error)
-            });
+        }).catch(function (error) {
+            throw new Error(error)
+        });
     }
 
     /**
@@ -303,9 +301,9 @@ class RobokassaPayAPI {
      *
      * @param {int} invId
      *
-     * @return bool
+     * @return TReCheck | never
      */
-    public reCheck(invId: number): boolean {
+    public reCheck(invId: number): TReCheck | never {
         const result = this.getData('OpState', {
             MerchantLogin: this.mrhLogin,
             InvoiceID: invId,
@@ -313,7 +311,33 @@ class RobokassaPayAPI {
             IsTest: Number(this.isTest)
         });
 
-        return result['Result']['Code'] === 0;
+        switch (result['Result']['Code']) {
+            case 0:
+                switch (result['State']['Code']) {
+                    case 5:
+                        return {code: 5, message: 'operation initiated', success: false};
+                    case 10:
+                        return {code: 10, message: 'operation cancelled money from the buyer was not received', success: false};
+                    case 50:
+                        return {code: 50, message: 'money from the buyer received is made by depositing the money into the account of the store', success: false};
+                    case 60:
+                        return {code: 60, message: 'money after receipt was returned to the buyer', success: false};
+                    case 80:
+                        return {code: 80, message: 'operation suspended', success: false};
+                    case 100:
+                        return {code: 100, message: 'operation was completed successfully', success: true};
+                    default:
+                        throw new Error('Unknown response code from the server')
+                }
+            case 1:
+                throw new Error('Incorrect digital signature request');
+            case 3:
+                throw new Error('Couldn\'t find the operation');
+            case 4:
+                throw new Error('Found two operations with the so InvoiceID');
+            default:
+                throw new Error('Unknown response code from the server')
+        }
     }
 
 }
