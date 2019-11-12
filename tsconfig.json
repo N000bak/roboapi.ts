@@ -11,12 +11,15 @@
     "declaration": true,
     "inlineSources": true,
     "noImplicitAny": false,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
     "types": ["node"]
   },
   "include": [
     "src/**/*"
   ],
   "exclude": [
+    "src/test",
     "node_modules"
   ]
 }

@@ -170,3 +170,4 @@ fabric.properties
 /package-lock.json
 public/*
 dist
+.nyc_output

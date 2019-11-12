@@ -8,7 +8,10 @@
     "start": "node --inspect=5858 -r ts-node/register ./src/index.ts",
     "start:watch": "nodemon",
     "build": "rimraf dist && tsc",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "mocha --require ts-node/register ./src/test/*.spec.ts",
+    "test:watch": "npm run test -- --watch-extensions ts --watch",
+    "test:coverage": "nyc npm run test"
   },
   "files": [
     "dist",
@@ -35,16 +38,27 @@
     "url": "https://github.com/Altairko/roboapi.ts/issues"
   },
   "homepage": "https://github.com/Altairko/roboapi.ts/issues#readme",
+  "dependencies": {
+    "axios": "^0.19.0",
+    "fast-xml-parser": "^3.14.0",
+    "lodash": "^4.17.15"
+  },
   "devDependencies": {
+    "@types/chai": "^4.2.4",
     "@types/lodash": "^4.14.145",
-    "@types/node": "^12.12.6",
+    "@types/mocha": "^5.2.7",
+    "@types/node": "^12.12.7",
     "@typescript-eslint/eslint-plugin": "^2.6.1",
     "@typescript-eslint/parser": "^2.6.1",
+    "axios-mock-adapter": "^1.17.0",
+    "chai": "^4.2.0",
     "eslint": "^6.6.0",
     "eslint-plugin-import": "^2.18.2",
     "husky": "^3.0.9",
     "lint-staged": "^9.4.2",
+    "mocha": "^6.2.2",
     "nodemon": "^1.19.4",
+    "nyc": "^14.1.1",
     "rimraf": "^3.0.0",
     "ts-node": "^8.4.1",
     "typescript": "^3.7.2"
@@ -73,9 +87,18 @@
       "pre-commit": "lint-staged"
     }
   },
-  "dependencies": {
-    "axios": "^0.19.0",
-    "fast-xml-parser": "^3.14.0",
-    "lodash": "^4.17.15"
+  "nyc": {
+    "extension": [
+      ".ts"
+    ],
+    "exclude": [
+      "coverage",
+      "**/test",
+      "**/*.d.ts"
+    ],
+    "reporter": [
+      "html"
+    ],
+    "all": true
   }
 }

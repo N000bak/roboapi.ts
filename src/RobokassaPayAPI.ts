@@ -1,12 +1,20 @@
-import {join, difference, includes, toUpper, forEach} from 'lodash';
+import {join, includes, toUpper, forEach, compact} from 'lodash';
 import {createHash} from 'crypto';
 import axios from 'axios';
 import {validate, parse} from 'fast-xml-parser';
+import {
+    REQUEST_SUCCESSFULLY,
+    NO_QUERY_OPTION,
+    PARTNER_NOT_FOUND,
+    PARTNER_INACTIVE,
+    PARTNER_NOT_AVAILABLE,
+    PARTNER_NOT_POSSIBLE, SMS_LIMIT_HIGHER, INVALID_REQUEST_SIGNATURE, INTERNAL_ERROR, UNKNOWN_ANSWER
+} from "./helpers/response";
 
 export type TSimpleObj = {
     [key: string]: any
 }
-export type TCurrency = 'USD' | 'EUR' | 'KZT';
+export type TCurrency = 'USD' | 'EUR' | 'KZT' | null;
 export type TPay = {
     Name: string;
     Label: string;
@@ -15,10 +23,17 @@ export type TPay = {
     MaxValue: number;
 }
 export type THash = 'md5' | 'ripemd160' | 'sha1' | 'sha256' | 'sha384' | 'sha512' | 'md5';
-export type TReCheck = {
+export type TResponse = {
     code: number;
     message: string;
     success: boolean;
+}
+export type TConstructorArgs = {
+    mrhLogin: string,
+    mrhPass1: string,
+    mrhPass2: string,
+    outCurrency?: TCurrency,
+    isTest?: boolean
 }
 
 
@@ -42,11 +57,6 @@ class RobokassaPayAPI {
     /**
      * @var string
      */
-    private method: string;
-
-    /**
-     * @var string
-     */
     private readonly apiUrl: string;
 
     /**
@@ -60,11 +70,6 @@ class RobokassaPayAPI {
     private readonly outCurrency: TCurrency;
 
     /**
-     * @var string
-     */
-    private response: TSimpleObj = {};
-
-    /**
      * @var boolean
      */
     private readonly isTest: boolean;
@@ -76,8 +81,8 @@ class RobokassaPayAPI {
      *
      * @return Promise<any>
      */
-    private static async createRequest(url: string, params: TSimpleObj): Promise<any> {
-        await axios({
+    private static createRequest(url: string, params: TSimpleObj): Promise<any> {
+        return axios({
             method: 'get',
             url,
             params,
@@ -85,36 +90,22 @@ class RobokassaPayAPI {
     }
 
     /**
-     * @param {string} mrhLogin
-     * @param {string} mrhPass1
-     * @param {string} mrhPass2
-     * @param {string} method
-     * @param {TCurrency} outCurrency
-     * @param {boolean} isTest
+     * @param {TConstructorArgs} args
+     * @param {string} args.mrhLogin - идентификатор
+     * @param {string} args.mrhPass1 - пароль 1
+     * @param {string} args.mrhPass2 - пароль 2
+     * @param {TCurrency} args.outCurrency - валюта (если не RUB)
+     * @param {boolean} args.isTest - тестовый запрос
      */
-    constructor(
-        mrhLogin: string,
-        mrhPass1: string,
-        mrhPass2: string,
-        method: string,
-        outCurrency: TCurrency,
-        isTest?: boolean
-    ) {
+    constructor(args: TConstructorArgs) {
+        const {mrhLogin, mrhPass1, mrhPass2, outCurrency, isTest} = args;
         this.mrhLogin = mrhLogin;
         this.mrhPass1 = mrhPass1;
         this.mrhPass2 = mrhPass2;
-        this.method = method;
-        this.outCurrency = outCurrency;
+        this.outCurrency = outCurrency || null;
         this.apiUrl = 'https://auth.robokassa.ru/Merchant/WebService/Service.asmx/';
         this.smsUrl = 'https://services.robokassa.ru/SMS/';
         this.isTest = isTest || false;
-    }
-
-    /**
-     * @return TSimpleObj
-     */
-    public getResponse(): TSimpleObj {
-        return this.response;
     }
 
     /**
@@ -131,33 +122,15 @@ class RobokassaPayAPI {
      * Если receiptJson пустой - то в формировании сигнатуры
      * он не будет использоваться, а если не пустой - используем его json-представление
      *
-     * @param {string} sum
-     * @param {string} invId
-     * @param {string} receiptJson
+     * @param {number} sum
+     * @param {number} invId - Номер счета в магазине
+     * @param {string} receiptJson - В этом параметре передается информация о перечне товаров/услуг, количестве,
+     * цене и ставке налога по каждой позиции.
      *
      * @return string
      */
-    private getSignatureString(sum: string, invId: string, receiptJson: string): string {
-
-        /** @var null|string outCurrency */
-        const outCurrency = this.outCurrency || null;
-
-        return join(
-            difference(
-                [
-                    this.mrhLogin,
-                    sum,
-                    invId,
-                    outCurrency,
-                    receiptJson,
-                    this.mrhPass1,
-                ],
-                [
-                    false,
-                    '',
-                    null
-                ]
-            ), ':');
+    public getSignatureString(sum: number, invId: number, receiptJson: string = ''): string {
+        return join(compact([this.mrhLogin, sum, invId, this.outCurrency, receiptJson, this.mrhPass1]), ':');
     }
 
     /**
@@ -188,41 +161,41 @@ class RobokassaPayAPI {
      * @return boolean | never
      * @throws \Exception
      */
-    public async sendSms(phone: string, message: string): Promise<boolean> | never {
+    public async sendSms(phone: string, message: string): Promise<TResponse> | never {
         const params = {
-            'login': this.mrhLogin,
-            'phone': phone,
-            'message': message,
-            'signature': this.getSignature(`${this.mrhLogin}:${phone}:${message}:${this.mrhPass1}`),
+            phone,
+            message,
+            login: this.mrhLogin,
+            signature: this.getSignature(`${this.mrhLogin}:${phone}:${message}:${this.mrhPass1}`),
         };
 
         try {
             const response = await RobokassaPayAPI.createRequest(this.smsUrl, params);
-            this.response = response;
-
-            return response && response['data'] && response['data']['result'] === 1;
+            switch (response?.data?.errorCode) {
+                case 0:
+                    return REQUEST_SUCCESSFULLY;
+                case 1:
+                    return NO_QUERY_OPTION;
+                case 2:
+                    return PARTNER_NOT_FOUND;
+                case 3:
+                    return PARTNER_INACTIVE;
+                case 4:
+                    return PARTNER_NOT_AVAILABLE;
+                case 5:
+                    return PARTNER_NOT_POSSIBLE;
+                case 6:
+                    return SMS_LIMIT_HIGHER;
+                case 1000:
+                    return INVALID_REQUEST_SIGNATURE;
+                case 9999:
+                    return INTERNAL_ERROR;
+                default:
+                    return UNKNOWN_ANSWER;
+            }
         } catch (error) {
-            throw new Error(error);
+            throw error;
         }
-    }
-
-    /**
-     * Запрашиват размер комиссии в процентах для конкретного способа оплаты
-     *
-     * @param {string} incCurrLabel Кодовое имя метода оплаты
-     * @param {int}    sum          Стоимость товара
-     *
-     * @return number Комиссия метода в %
-     */
-    public getCommission(incCurrLabel: string, sum = 10000): number {
-        const parsed = this.getData('CalcOutSumm', {
-            MerchantLogin: this.mrhLogin,
-            IncCurrLabel: incCurrLabel === 'all' ? '' : incCurrLabel,
-            IncSum: sum,
-            IsTest: Number(this.isTest)
-        });
-
-        return Math.abs(Math.round((sum - parsed['OutSum']) / parsed['OutSum'] * 100));
     }
 
     /**
@@ -257,9 +230,9 @@ class RobokassaPayAPI {
         });
 
         const paymentMethods: TPay[] | unknown[] = [];
-        if (parsed && parsed['Groups']) {
-            forEach(parsed['Groups'] && parsed['Groups']['Group'], group => {
-                if (group && group['Items'] && group['Items']['Currency']) {
+        if (parsed?.Groups) {
+            forEach(parsed?.Groups?.Group, group => {
+                if (group?.Items?.Currency) {
                     forEach(group['Items']['Currency'], currency => {
                         paymentMethods.push({
                             Name: currency['@_Name'],
@@ -288,11 +261,11 @@ class RobokassaPayAPI {
     private parseXmlAndConvertToJson(apiUrl: string, controller: string, params: TSimpleObj): TSimpleObj | never {
         const url = `${apiUrl}/${controller}`;
         return RobokassaPayAPI.createRequest(url, params).then(function (response) {
-            if (response && response.data && validate(response.data)) {
+            if (response?.data && validate(response?.data)) {
                 return parse(response.data)
             }
         }).catch(function (error) {
-            throw new Error(error)
+            throw error
         });
     }
 
@@ -301,10 +274,10 @@ class RobokassaPayAPI {
      *
      * @param {int} invId
      *
-     * @return TReCheck | never
+     * @return TResponse | never
      */
-    public reCheck(invId: number): TReCheck | never {
-        const result = this.getData('OpState', {
+    public reCheck(invId: number): TResponse | never {
+        const result = this.getData('OpStateExt', {
             MerchantLogin: this.mrhLogin,
             InvoiceID: invId,
             Signature: this.getSignature(`${this.mrhLogin}:${invId}:${this.mrhPass2}`, 'md5'),
