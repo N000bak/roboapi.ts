@@ -1,0 +1,21 @@
+{
+  "sno": "osn",
+  "items": [
+    {
+      "name": "Название товара 1",
+      "quantity": 1,
+      "sum": 100,
+      "payment_method": "full_payment",
+      "payment_object": "commodity",
+      "tax": "vat10"
+    },
+    {
+      "name": "Название товара 2",
+      "quantity": 3,
+      "sum": 450,
+      "payment_method": "full_prepayment",
+      "payment_object": "excise",
+      "tax": "vat120"
+    }
+  ]
+}
