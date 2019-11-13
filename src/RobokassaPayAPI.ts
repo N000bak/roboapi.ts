@@ -350,7 +350,6 @@ class RobokassaPayAPI {
             throw e
         }
     }
-
 }
 
 export default RobokassaPayAPI;
