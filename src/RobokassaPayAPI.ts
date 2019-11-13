@@ -349,7 +349,6 @@ class RobokassaPayAPI {
         } catch (e) {
             throw e
         }
-
     }
 
 }
