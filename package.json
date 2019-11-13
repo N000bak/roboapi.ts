@@ -9,7 +9,7 @@
     "start:watch": "nodemon",
     "build": "rimraf dist && tsc",
     "lint": "eslint",
-    "test": "mocha --require ts-node/register ./src/test/*.spec.ts",
+    "test": "mocha --require ts-node/register test/*.spec.ts",
     "test:watch": "npm run test -- --watch-extensions ts --watch",
     "test:coverage": "nyc npm run test"
   },
@@ -81,7 +81,6 @@
   "lint-staged": {
     "*.ts": [
       "npm run lint --fix",
-      "conventional-changelog -p angular -i CHANGELOG.md -s",
       "git add"
     ]
   },

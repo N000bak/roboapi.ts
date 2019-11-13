@@ -19,7 +19,7 @@
     "src/**/*"
   ],
   "exclude": [
-    "src/test",
+    "test",
     "node_modules"
   ]
 }

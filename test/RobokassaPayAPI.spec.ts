@@ -2,7 +2,7 @@ import 'mocha';
 import {expect} from 'chai';
 import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
-import RobokassaPayAPI from "../RobokassaPayAPI";
+import RobokassaPayAPI from "../src/RobokassaPayAPI";
 import receipt from './helpers/receipt.json'
 import {
     OPERATION_COMPLETED_SUCCESSFULLY,
@@ -17,7 +17,7 @@ import {
     MONEY_RETURNED_BUYER,
     OPERATION_SUSPENDED,
     UNKNOWN_ANSWER
-} from "../helpers/response";
+} from "../src/helpers/response";
 import calcOutSumError from './helpers/calcOutSumError';
 import calcOutSumSuccess from './helpers/calcOutSumSuccess';
 import fullCurrencies from "./helpers/fullCurrencies";
