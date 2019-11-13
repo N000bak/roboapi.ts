@@ -8,7 +8,18 @@ import {
     PARTNER_NOT_FOUND,
     PARTNER_INACTIVE,
     PARTNER_NOT_AVAILABLE,
-    PARTNER_NOT_POSSIBLE, SMS_LIMIT_HIGHER, INVALID_REQUEST_SIGNATURE, INTERNAL_ERROR, UNKNOWN_ANSWER
+    PARTNER_NOT_POSSIBLE,
+    SMS_LIMIT_HIGHER,
+    INVALID_REQUEST_SIGNATURE,
+    INTERNAL_ERROR,
+    UNKNOWN_ANSWER,
+    OPERATION_INITIATED,
+    OPERATION_CANCELLED_MONEY_NOT_RECEIVED,
+    MONEY_CREDITED_STORE,
+    MONEY_RETURNED_BUYER,
+    OPERATION_SUSPENDED,
+    OPERATION_COMPLETED_SUCCESSFULLY,
+    INCORRECT_SIGNATURE, OPERATION_NOT_FOUND, FOUND_TWO_OPERATIONS
 } from "./helpers/response";
 
 export type TSimpleObj = {
@@ -35,7 +46,7 @@ export type TConstructorArgs = {
     outCurrency?: TCurrency,
     isTest?: boolean
 }
-
+export type THttpMethod = 'GET' | 'POST';
 
 class RobokassaPayAPI {
 
@@ -76,16 +87,17 @@ class RobokassaPayAPI {
 
     /**
      *
+     * @param {THttpMethod} httpMethod
      * @param {string} url
      * @param {TSimpleObj} params
      *
      * @return Promise<any>
      */
-    private static createRequest(url: string, params: TSimpleObj): Promise<any> {
+    private static createRequest(httpMethod: THttpMethod, url: string, params: TSimpleObj): Promise<any> {
         return axios({
-            method: 'get',
+            method: httpMethod,
             url,
-            params,
+            [httpMethod === 'GET' ? 'params' : 'data']: params,
         });
     }
 
@@ -103,19 +115,20 @@ class RobokassaPayAPI {
         this.mrhPass1 = mrhPass1;
         this.mrhPass2 = mrhPass2;
         this.outCurrency = outCurrency || null;
-        this.apiUrl = 'https://auth.robokassa.ru/Merchant/WebService/Service.asmx/';
+        this.apiUrl = 'https://auth.robokassa.ru/Merchant/WebService/Service.asmx';
         this.smsUrl = 'https://services.robokassa.ru/SMS/';
         this.isTest = isTest || false;
     }
 
     /**
+     * @param {THttpMethod} httpMethod
      * @param {string} apiMethod
      * @param {TSimpleObj}  params
      *
-     * @return TSimpleObj
+     * @return Promise<TSimpleObj>
      */
-    private getData(apiMethod: string, params: TSimpleObj): TSimpleObj {
-        return this.parseXmlAndConvertToJson(this.apiUrl, apiMethod, params);
+    private getData(httpMethod: THttpMethod, apiMethod: string, params: TSimpleObj): Promise<TSimpleObj> | never {
+        return this.parseXmlAndConvertToJson(httpMethod, this.apiUrl, apiMethod, params);
     }
 
     /**
@@ -170,7 +183,7 @@ class RobokassaPayAPI {
         };
 
         try {
-            const response = await RobokassaPayAPI.createRequest(this.smsUrl, params);
+            const response = await RobokassaPayAPI.createRequest('GET', this.smsUrl, params);
             switch (response?.data?.errorCode) {
                 case 0:
                     return REQUEST_SUCCESSFULLY;
@@ -199,73 +212,94 @@ class RobokassaPayAPI {
     }
 
     /**
-     * Возвращает сумму к оплате с учетом комиссий.
+     * Возвращает сумму к оплате с учетом комиссии.
      *
      * @param {string} incCurrLabel Кодовое имя метода оплаты
      * @param {int}    sum          Стоимость товара
      *
-     * @return number Стоимость, которую необходимо передавать в Робокассу.
+     * @return Promise<number> Стоимость, которую необходимо передавать в Робокассу.
      */
-    public getCommissionSum(incCurrLabel: string, sum: number): number {
-        const parsed = this.getData('CalcOutSumm', {
+    public async getCommissionSum(incCurrLabel: string, sum: number): Promise<number> | never {
+        const parsed = await this.getData('POST', 'CalcOutSumm', {
             MerchantLogin: this.mrhLogin,
             IncCurrLabel: incCurrLabel,
             IncSum: sum,
             IsTest: Number(this.isTest)
         });
 
-        return parsed && parsed.OutSum;
+        try {
+            if (parsed?.CalcSummsResponseData?.OutSum > 0) {
+                return parsed?.CalcSummsResponseData?.OutSum
+            }
+
+            throw new Error('there was an error in the calculation of the commission');
+        } catch (e) {
+            throw e;
+        }
     }
 
     /**
-     * Получение списка валют, доступных магазину
+     * Получение списка способов оплаты (в офф. документации валют), доступных магазину
      *
-     * @return Array<TPay> | Array<unknown>
+     * @return Promise<TPay[] | unknown[]> | never
      */
-    public getCurrLabels(): TPay[] | unknown[] {
-        const parsed = this.getData('GetCurrencies', {
+    public async getCurrencies(): Promise<TPay[] | unknown[]> | never {
+        const parsed = await this.getData('POST', 'GetCurrencies', {
             MerchantLogin: this.mrhLogin,
             Language: 'ru',
             IsTest: Number(this.isTest)
         });
 
-        const paymentMethods: TPay[] | unknown[] = [];
-        if (parsed?.Groups) {
-            forEach(parsed?.Groups?.Group, group => {
-                if (group?.Items?.Currency) {
-                    forEach(group['Items']['Currency'], currency => {
-                        paymentMethods.push({
-                            Name: currency['@_Name'],
-                            Label: currency['@_Label'],
-                            Alias: currency['@_Alias'],
-                            MinValue: currency['@_MinValue'] ? currency['@_MinValue'] : 0,
-                            MaxValue: currency['@_MaxValue'] ? currency['@_MaxValue'] : 9999999,
-                        } as TPay);
-                    });
-                }
-            })
-        }
+        try {
+            const paymentMethods: TPay[] | unknown[] = [];
 
-        return paymentMethods;
+            if (parsed?.CurrenciesList?.Groups) {
+                forEach(parsed?.CurrenciesList?.Groups, group => {
+                    if (group?.[0]?.Items?.Currency) {
+                        forEach(group?.[0]?.Items?.Currency, currency => {
+                            paymentMethods.push({
+                                Name: currency['@_Name'],
+                                Label: currency['@_Label'],
+                                Alias: currency['@_Alias'],
+                                MinValue: currency['@_MinValue'] ? Number(currency['@_MinValue']) : 0,
+                                MaxValue: currency['@_MaxValue'] ? Number(currency['@_MaxValue']) : 9999999,
+                            } as TPay);
+                        });
+                    }
+                })
+            }
+
+            return paymentMethods;
+        } catch (e) {
+            throw e
+        }
     }
 
     /**
      * Парсит XML в JSON
      *
+     * @param {THttpMethod} httpMethod
      * @param {string} apiUrl
      * @param {string} controller
      * @param {TSimpleObj} params
      *
-     * @return TSimpleObj | never
+     * @return Promise<TSimpleObj> | never
      */
-    private parseXmlAndConvertToJson(apiUrl: string, controller: string, params: TSimpleObj): TSimpleObj | never {
+    private parseXmlAndConvertToJson(
+        httpMethod: THttpMethod,
+        apiUrl: string,
+        controller: string,
+        params: TSimpleObj
+    ): Promise<TSimpleObj> | never {
         const url = `${apiUrl}/${controller}`;
-        return RobokassaPayAPI.createRequest(url, params).then(function (response) {
+        return RobokassaPayAPI.createRequest(httpMethod, url, params).then(response => {
             if (response?.data && validate(response?.data)) {
-                return parse(response.data)
+                return parse(response.data, {
+                    ignoreAttributes: false
+                })
             }
-        }).catch(function (error) {
-            throw error
+        }).catch(error => {
+            return Promise.reject(error.message)
         });
     }
 
@@ -274,43 +308,48 @@ class RobokassaPayAPI {
      *
      * @param {int} invId
      *
-     * @return TResponse | never
+     * @return Promise<TResponse> | never
      */
-    public reCheck(invId: number): TResponse | never {
-        const result = this.getData('OpStateExt', {
+    public async checkPayment(invId: number): Promise<TResponse> | never {
+        const result = await this.getData('POST', 'OpStateExt', {
             MerchantLogin: this.mrhLogin,
             InvoiceID: invId,
             Signature: this.getSignature(`${this.mrhLogin}:${invId}:${this.mrhPass2}`, 'md5'),
             IsTest: Number(this.isTest)
         });
 
-        switch (result['Result']['Code']) {
-            case 0:
-                switch (result['State']['Code']) {
-                    case 5:
-                        return {code: 5, message: 'operation initiated', success: false};
-                    case 10:
-                        return {code: 10, message: 'operation cancelled money from the buyer was not received', success: false};
-                    case 50:
-                        return {code: 50, message: 'money from the buyer received is made by depositing the money into the account of the store', success: false};
-                    case 60:
-                        return {code: 60, message: 'money after receipt was returned to the buyer', success: false};
-                    case 80:
-                        return {code: 80, message: 'operation suspended', success: false};
-                    case 100:
-                        return {code: 100, message: 'operation was completed successfully', success: true};
-                    default:
-                        throw new Error('Unknown response code from the server')
-                }
-            case 1:
-                throw new Error('Incorrect digital signature request');
-            case 3:
-                throw new Error('Couldn\'t find the operation');
-            case 4:
-                throw new Error('Found two operations with the so InvoiceID');
-            default:
-                throw new Error('Unknown response code from the server')
+        try {
+            switch (result?.OperationStateResponse?.Result?.Code) {
+                case 0:
+                    switch (result?.OperationStateResponse?.State?.Code) {
+                        case 5:
+                            return OPERATION_INITIATED;
+                        case 10:
+                            return OPERATION_CANCELLED_MONEY_NOT_RECEIVED;
+                        case 50:
+                            return MONEY_CREDITED_STORE;
+                        case 60:
+                            return MONEY_RETURNED_BUYER;
+                        case 80:
+                            return OPERATION_SUSPENDED;
+                        case 100:
+                            return OPERATION_COMPLETED_SUCCESSFULLY;
+                        default:
+                            return UNKNOWN_ANSWER;
+                    }
+                case 1:
+                    return INCORRECT_SIGNATURE;
+                case 3:
+                    return OPERATION_NOT_FOUND;
+                case 4:
+                    return FOUND_TWO_OPERATIONS;
+                default:
+                    return UNKNOWN_ANSWER;
+            }
+        } catch (e) {
+            throw e
         }
+
     }
 
 }
