@@ -1,4 +1,4 @@
-import {join, includes, toUpper, forEach, compact} from 'lodash';
+import {join, includes, toUpper, forEach, compact, map} from 'lodash';
 import {createHash} from 'crypto';
 import axios from 'axios';
 import {validate, parse} from 'fast-xml-parser';
@@ -47,6 +47,22 @@ export type TConstructorArgs = {
     isTest?: boolean
 }
 export type THttpMethod = 'GET' | 'POST';
+export type TLinkArgs = {
+    /** Сумма платежа */
+    outSum: number;
+
+    /** Номер инвойса в магазине */
+    invId: number;
+
+    /** Описание */
+    description: string;
+
+    /** Метод хеширования */
+    hashMethod: THash;
+
+    /** Пользовательские параметры */
+    customSettings?: TSimpleObj;
+}
 
 class RobokassaPayAPI {
 
@@ -69,6 +85,11 @@ class RobokassaPayAPI {
      * @var string
      */
     private readonly apiUrl: string;
+
+    /**
+     * @var string
+     */
+    private readonly paymentUrl: string;
 
     /**
      * @var string
@@ -117,7 +138,44 @@ class RobokassaPayAPI {
         this.outCurrency = outCurrency || null;
         this.apiUrl = 'https://auth.robokassa.ru/Merchant/WebService/Service.asmx';
         this.smsUrl = 'https://services.robokassa.ru/SMS/';
+        this.paymentUrl = 'https://auth.robokassa.ru/Merchant/Index.aspx';
         this.isTest = isTest || false;
+    }
+
+    /**
+     * Возвращает ссылку для перехода на страницу с оплатой
+     * @param {TLinkArgs} args - аргументы
+     * @return string
+     */
+    public getLink(args: TLinkArgs): string {
+        const {outSum, invId, description, hashMethod, customSettings} = args;
+
+        let customSettingsStr;
+        if (customSettings) {
+            customSettingsStr = map(customSettings, (value, key) => {
+                return `SHP_${key}=${value}`
+            }).join(':')
+        }
+
+        const signature = this.getSignature(compact([
+            this.mrhLogin,
+            outSum,
+            invId,
+            this.mrhPass1,
+            customSettingsStr
+        ]).join(':'), hashMethod);
+
+        const requestParams = compact([
+            `MerchantLogin=${this.mrhLogin}`,
+            `OutSum=${outSum}`,
+            `InvoiceID=${invId}`,
+            `Description=${description}`,
+            `SignatureValue=${signature}`,
+            `IsTest=${Number(this.isTest)}`,
+            customSettingsStr
+        ]).join('&');
+
+        return `${this.paymentUrl}?${requestParams}`
     }
 
     /**
@@ -307,14 +365,15 @@ class RobokassaPayAPI {
      * Запрашивает у робокассы подтверждение платежа
      *
      * @param {int} invId
+     * @param {THash} hashMethod
      *
      * @return Promise<TResponse> | never
      */
-    public async checkPayment(invId: number): Promise<TResponse> | never {
+    public async checkPayment(invId: number, hashMethod: THash): Promise<TResponse> | never {
         const result = await this.getData('POST', 'OpStateExt', {
             MerchantLogin: this.mrhLogin,
             InvoiceID: invId,
-            Signature: this.getSignature(`${this.mrhLogin}:${invId}:${this.mrhPass2}`, 'md5'),
+            Signature: this.getSignature(`${this.mrhLogin}:${invId}:${this.mrhPass2}`, hashMethod),
             IsTest: Number(this.isTest)
         });
 

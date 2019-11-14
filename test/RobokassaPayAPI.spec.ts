@@ -26,15 +26,15 @@ import emptyOperation from "./helpers/emptyOperation";
 import fullOperation from "./helpers/fullOperation";
 import incompleteOperation from "./helpers/incompleteOperation";
 
-const mrhLogin = 'login';
-const mrhPass1 = 'pass1';
-const mrhPass2 = 'pass2';
+const mrhLogin = 'demo';
+const mrhPass1 = 'password_1';
+const mrhPass2 = 'password_2';
 const isTest = true;
 
 
 const mock = new MockAdapter(axios);
 const sum = 100;
-const invId = 1;
+const invId = 93;
 
 
 describe('RobokassaPayAPI check methods', () => {
@@ -49,6 +49,17 @@ describe('RobokassaPayAPI check methods', () => {
         mock.reset();
     });
 
+    describe('Получаем ссылку на оплату', () => {
+        it('Ссылка успешно получена', () => {
+            const paymentLink = RobokassaPay.getLink({
+                invId,
+                description: 'Тестовая оплата',
+                outSum: 100500,
+                hashMethod: 'md5'
+            });
+            expect(paymentLink).to.be.a('string');
+        })
+    });
     describe('Получаем контрольную сумму подписи', () => {
         it('Получаем строку для подписи без JSON', (done) => {
             const signatureString = RobokassaPay.getSignatureString(sum, invId);
@@ -205,7 +216,7 @@ describe('RobokassaPayAPI check methods', () => {
         const checkPaymentMock = mock.onPost('https://auth.robokassa.ru/Merchant/WebService/Service.asmx/OpStateExt');
         it('Статус оплаты получен. Платеж успешно проведен', (done) => {
             checkPaymentMock.reply(200, fullOperation);
-            RobokassaPay.checkPayment(1234).then(result => {
+            RobokassaPay.checkPayment(1234, 'md5').then(result => {
                 expect(result).to.deep.equal(OPERATION_COMPLETED_SUCCESSFULLY);
                 done();
             }).catch(e => {
@@ -214,7 +225,7 @@ describe('RobokassaPayAPI check methods', () => {
         });
         it('Неверная цифровая подпись запроса', (done) => {
             checkPaymentMock.reply(200, emptyOperation(1));
-            RobokassaPay.checkPayment(1234).then(result => {
+            RobokassaPay.checkPayment(1234, 'md5').then(result => {
                 expect(result).to.deep.equal(INCORRECT_SIGNATURE);
                 done();
             }).catch(e => {
@@ -223,7 +234,7 @@ describe('RobokassaPayAPI check methods', () => {
         });
         it('Не удалось найти операцию', (done) => {
             checkPaymentMock.reply(200, emptyOperation(3));
-            RobokassaPay.checkPayment(1234).then(result => {
+            RobokassaPay.checkPayment(1234, 'md5').then(result => {
                 expect(result).to.deep.equal(OPERATION_NOT_FOUND);
                 done();
             }).catch(e => {
@@ -232,7 +243,7 @@ describe('RobokassaPayAPI check methods', () => {
         });
         it('найдено две операции с таким InvoiceID', (done) => {
             checkPaymentMock.reply(200, emptyOperation(4));
-            RobokassaPay.checkPayment(1234).then(result => {
+            RobokassaPay.checkPayment(1234, 'md5').then(result => {
                 expect(result).to.deep.equal(FOUND_TWO_OPERATIONS);
                 done();
             }).catch(e => {
@@ -241,7 +252,7 @@ describe('RobokassaPayAPI check methods', () => {
         });
         it('Операция только инициализирована', (done) => {
             checkPaymentMock.reply(200, incompleteOperation(5));
-            RobokassaPay.checkPayment(1234).then(result => {
+            RobokassaPay.checkPayment(1234, 'md5').then(result => {
                 expect(result).to.deep.equal(OPERATION_INITIATED);
                 done();
             }).catch(e => {
@@ -250,7 +261,7 @@ describe('RobokassaPayAPI check methods', () => {
         });
         it('Операция отменена, деньги от покупателя не были получены', (done) => {
             checkPaymentMock.reply(200, incompleteOperation(10));
-            RobokassaPay.checkPayment(1234).then(result => {
+            RobokassaPay.checkPayment(1234, 'md5').then(result => {
                 expect(result).to.deep.equal(OPERATION_CANCELLED_MONEY_NOT_RECEIVED);
                 done();
             }).catch(e => {
@@ -259,7 +270,7 @@ describe('RobokassaPayAPI check methods', () => {
         });
         it('Деньги от покупателя получены, производится зачисление денег на счет магазина', (done) => {
             checkPaymentMock.reply(200, incompleteOperation(50));
-            RobokassaPay.checkPayment(1234).then(result => {
+            RobokassaPay.checkPayment(1234, 'md5').then(result => {
                 expect(result).to.deep.equal(MONEY_CREDITED_STORE);
                 done();
             }).catch(e => {
@@ -268,7 +279,7 @@ describe('RobokassaPayAPI check methods', () => {
         });
         it('Деньги после получения были возвращены покупателю', (done) => {
             checkPaymentMock.reply(200, incompleteOperation(60));
-            RobokassaPay.checkPayment(1234).then(result => {
+            RobokassaPay.checkPayment(1234, 'md5').then(result => {
                 expect(result).to.deep.equal(MONEY_RETURNED_BUYER);
                 done();
             }).catch(e => {
@@ -277,7 +288,7 @@ describe('RobokassaPayAPI check methods', () => {
         });
         it('Исполнение операции приостановлено', (done) => {
             checkPaymentMock.reply(200, incompleteOperation(80));
-            RobokassaPay.checkPayment(1234).then(result => {
+            RobokassaPay.checkPayment(1234, 'md5').then(result => {
                 expect(result).to.deep.equal(OPERATION_SUSPENDED);
                 done();
             }).catch(e => {
@@ -286,7 +297,7 @@ describe('RobokassaPayAPI check methods', () => {
         });
         it('Неизвестный код сотояния оплаты', (done) => {
             checkPaymentMock.reply(200, incompleteOperation(800));
-            RobokassaPay.checkPayment(1234).then(result => {
+            RobokassaPay.checkPayment(1234, 'md5').then(result => {
                 expect(result).to.deep.equal(UNKNOWN_ANSWER);
                 done();
             }).catch(e => {
@@ -295,7 +306,7 @@ describe('RobokassaPayAPI check methods', () => {
         });
         it('Неизвестный код результата оплаты', (done) => {
             checkPaymentMock.reply(200, emptyOperation(800));
-            RobokassaPay.checkPayment(1234).then(result => {
+            RobokassaPay.checkPayment(1234, 'md5').then(result => {
                 expect(result).to.deep.equal(UNKNOWN_ANSWER);
                 done();
             }).catch(e => {
