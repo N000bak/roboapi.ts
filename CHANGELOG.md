@@ -1,3 +1,16 @@
+# 2.0.0 (2019-11-14)
+
+### Features
+
+* добавил метод getLink ([e3ab249](https://github.com/Altairko/roboapi.ts/commit/e3ab2493bd39e54733fd94370844c5557937138b))
+
+
+### BREAKING CHANGES
+
+* добавил обязательный параметр с методом хеширования в checkPayment ([e3ab249](https://github.com/Altairko/roboapi.ts/commit/e3ab2493bd39e54733fd94370844c5557937138b))
+
+
+
 ## 1.0.1 (2019-11-13)
 
 
