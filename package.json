@@ -1,6 +1,6 @@
 {
   "name": "roboapi.ts",
-  "version": "2.0.0",
+  "version": "2.0.0-0",
   "description": "Robokassa API Library",
   "main": "dist/RobokassaPayAPI.js",
   "types": "dist/RobokassaPayAPI.d.ts",
